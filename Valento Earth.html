@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Valento Earth</title>
+
+  <link rel="stylesheet" href="./cesium/Widgets/widgets.css"
+        onerror="this.href='https://cdn.jsdelivr.net/npm/cesium@1.119.0/Build/Cesium/Widgets/widgets.css'">
+
+  <style>
+    :root{
+      --bg: rgba(10, 22, 40, 0.82);
+      --ink: #eaf2ff;
+      --mute: #8fa6c4;
+      --acc: #f2b84b;
+      --line: rgba(255,255,255,.14);
+      --shadow: 0 10px 30px rgba(0,0,0,.32);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; background: #050b16;
+      font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
+      overflow: hidden;
+    }
+
+    #globe { position: absolute; inset: 0; }
+    .cesium-viewer-bottom, .cesium-widget-credits { display: none !important; }
+
+    .panel{
+      position: absolute;
+      background: var(--bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    #top{
+      top: 12px; left: 12px; right: 12px;
+      max-width: 540px; padding: 8px;
+      display: flex; gap: 8px; align-items: center;
+      z-index: 10;
+    }
+
+    #brand{
+      font-weight: 700; letter-spacing: .3px;
+      padding: 0 6px; white-space: nowrap;
+      font-size: 15px;
+    }
+    #brand b { color: var(--acc); }
+
+    #q{
+      flex: 1; min-width: 0;
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--ink);
+      padding: 10px 11px;
+      font-size: 15px; outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    #q:focus{
+      border-color: var(--acc);
+      box-shadow: 0 0 0 3px rgba(242,184,75,.18);
+    }
+
+    button{
+      background: rgba(255,255,255,.08);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 9px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background .2s ease, border-color .2s ease, transform .12s ease;
+      user-select: none;
+    }
+    button:hover { background: rgba(255,255,255,.15); }
+    button:active { transform: translateY(1px); }
+    button.on{
+      background: var(--acc);
+      color: #1a1200;
+      border-color: var(--acc);
+    }
+
+    #tools{
+      top: 82px; left: 12px;
+      padding: 8px;
+      display: flex; flex-direction: column; gap: 6px;
+      width: 170px;
+      z-index: 7;
+    }
+    #tools .h{
+      color: var(--mute);
+      font-size: 12px;
+      margin: 4px 2px 0;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    #readout{
+      left: 12px; bottom: 12px;
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--mute);
+      max-width: calc(100% - 24px);
+      line-height: 1.4;
+      z-index: 8;
+    }
+    #readout b { color: var(--ink); font-weight: 600; }
+
+    #msr{
+      right: 12px; top: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      display: none;
+      z-index: 9;
+      min-width: 190px;
+      line-height: 1.5;
+    }
+
+    #nav{
+      right: 12px; bottom: 42px;
+      padding: 6px;
+      display: flex; flex-direction: column; gap: 6px;
+      z-index: 9;
+    }
+    #nav button{ width: 42px; padding: 9px 0; }
+
+    #tok{
+      display: none; flex-direction: column; gap: 6px;
+      margin-top: 4px;
+    }
+    #tok input{
+      background: rgba(255,255,255,.08);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      padding: 8px 9px;
+      font-size: 12px; width: 100%;
+      outline: none;
+    }
+    #tok input:focus{
+      border-color: var(--acc);
+      box-shadow: 0 0 0 3px rgba(242,184,75,.12);
+    }
+
+    @media (max-width: 560px){
+      #tools{
+        width: auto;
+        max-width: calc(100% - 24px);
+        flex-direction: row;
+        flex-wrap: wrap;
+        right: 12px;
+        top: 72px;
+      }
+      #tools .h { display: none; }
+      #nav { bottom: 74px; }
+      #top { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="globe"></div>
+
+  <div id="top" class="panel">
+    <span id="brand">Valento <b>Earth</b></span>
+    <input id="q" placeholder="Search a place, country, region, or lat, lon" autocomplete="off">
+    <button id="go">Go</button>
+  </div>
+
+  <div id="tools" class="panel">
+    <div class="h">Map style</div>
+    <button data-l="sat" class="on">Satellite</button>
+    <button data-l="osm">Streets</button>
+    <button data-l="topo">Terrain</button>
+
+    <div class="h">Layers</div>
+    <button id="lbl" class="on">Labels</button>
+    <button id="grid">Gridlines</button>
+
+    <div class="h">Tools</div>
+    <button id="mDist">Measure distance</button>
+    <button id="mArea">Measure area</button>
+    <button id="clr">Clear</button>
+    <button id="me">My location</button>
+    <button id="spin">Spin globe</button>
+    <button id="tokB">3D buildings</button>
+
+    <div id="tok">
+      <input id="tokI" placeholder="Free Cesium ion token">
+      <button id="tokGo">Enable</button>
+    </div>
+  </div>
+
+  <div id="msr" class="panel"></div>
+
+  <div id="nav" class="panel">
+    <button id="tiltU" title="Tilt up">⤒</button>
+    <button id="tiltD" title="Tilt down">⤓</button>
+    <button id="north" title="Face north">N</button>
+    <button id="home" title="Whole Earth">⌂</button>
+  </div>
+
+  <div id="readout" class="panel">Drag to rotate · scroll to zoom · right-drag or Ctrl-drag to tilt</div>
+
+  <script>
+    function loadCesiumFromLocalOrCdn() {
+      const localScript = "./cesium/Cesium.js";
+      const cdnScript = "https://cdn.jsdelivr.net/npm/cesium@1.119.0/Build/Cesium/Cesium.js";
+
+      const script = document.createElement("script");
+      script.src = localScript;
+      script.async = false;
+
+      script.onerror = function () {
+        const fallback = document.createElement("script");
+        fallback.src = cdnScript;
+        fallback.async = false;
+        fallback.onload = initApp;
+        document.head.appendChild(fallback);
+      };
+
+      script.onload = initApp;
+      document.head.appendChild(script);
+    }
+
+    function initApp() {
+      if (!window.Cesium) {
+        const readout = document.getElementById("readout");
+        readout.innerHTML = "Cesium failed to load. Check the local `cesium/` folder or internet connection.";
+        return;
+      }
+
+      const C = Cesium;
+
+      const viewer = new C.Viewer("globe", {
+        baseLayerPicker: false,
+        geocoder: false,
+        homeButton: false,
+        sceneModePicker: false,
+        navigationHelpButton: false,
+        animation: false,
+        timeline: false,
+        fullscreenButton: false,
+        infoBox: false,
+        selectionIndicator: false,
+        baseLayer: false,
+        requestRenderMode: false
+      });
+
+      const sc = viewer.scene;
+      const g = sc.globe;
+
+      g.enableLighting = false;
+      g.showGroundAtmosphere = true;
+      sc.skyAtmosphere.show = true;
+      sc.highDynamicRange = false;
+      g.maximumScreenSpaceError = 1.5;
+      sc.screenSpaceCameraController.enableCollisionDetection = true;
+
+      const SRC = {
+        sat: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        osm: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        topo: "https://tile.opentopomap.org/{z}/{x}/{y}.png",
+        lab: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+      };
+
+      const mk = (u, max) => new C.UrlTemplateImageryProvider({
+        url: u,
+        maximumLevel: max,
+        credit: ""
+      });
+
+      let base = null;
+      let labels = null;
+      let gridL = null;
+      let spinning = false;
+
+      function setBase(k) {
+        if (base) sc.imageryLayers.remove(base, true);
+        base = sc.imageryLayers.addImageryProvider(
+          mk(SRC[k], k === "sat" ? 19 : k === "topo" ? 17 : 19),
+          0
+        );
+
+        document.querySelectorAll("[data-l]").forEach((b) => {
+          b.classList.toggle("on", b.dataset.l === k);
+        });
+
+        const lb = document.getElementById("lbl");
+        lb.disabled = k !== "sat";
+        if (k !== "sat") setLabels(false);
+        else setLabels(lb.classList.contains("on"));
+      }
+
+      function setLabels(on) {
+        if (labels) { sc.imageryLayers.remove(labels, true); labels = null; }
+        if (on && base && document.querySelector("[data-l].on").dataset.l === "sat") {
+          labels = sc.imageryLayers.addImageryProvider(mk(SRC.lab, 13));
+        }
+      }
+
+      setBase("sat");
+      setLabels(true);
+
+      document.querySelectorAll("[data-l]").forEach((b) => {
+        b.onclick = () => setBase(b.dataset.l);
+      });
+
+      document.getElementById("lbl").onclick = (e) => {
+        e.target.classList.toggle("on");
+        setLabels(e.target.classList.contains("on"));
+      };
+
+      document.getElementById("grid").onclick = (e) => {
+        e.target.classList.toggle("on");
+        if (gridL) { sc.imageryLayers.remove(gridL, true); gridL = null; }
+        if (e.target.classList.contains("on")) {
+          gridL = sc.imageryLayers.addImageryProvider(
+            new C.GridImageryProvider({
+              cells: 8,
+              color: C.Color.WHITE.withAlpha(.35),
+              glowColor: C.Color.WHITE.withAlpha(.1),
+              backgroundColor: C.Color.TRANSPARENT
+            })
+          );
+        }
+      };
+
+      const home = () => {
+        viewer.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(20, 15, 2.2e7),
+          duration: 2.2
+        });
+      };
+
+      function fly(lon, lat, h, opts = {}) {
+        const orientation = opts.orientation || {
+          heading: 0,
+          pitch: C.Math.toRadians(-45),
+          roll: 0
+        };
+
+        viewer.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(lon, lat, h),
+          orientation,
+          duration: opts.duration || 3
+        });
+      }
+
+      viewer.camera.setView({
+        destination: C.Cartesian3.fromDegrees(0, 10, 3.2e7)
+      });
+
+      setTimeout(() => {
+        viewer.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(10, 25, 1.9e7),
+          duration: 2.8
+        });
+      }, 450);
+
+      document.getElementById("home").onclick = home;
+
+      const ro = document.getElementById("readout");
+      function note(html) { ro.innerHTML = html; }
+
+      async function search() {
+        const q = document.getElementById("q").value.trim();
+        if (!q) return;
+
+        const latLonMatch = q.match(/^(-?\d+(\.\d+)?)[,\s]+(-?\d+(\.\d+)?)$/);
+        if (latLonMatch) {
+          const lat = Number(latLonMatch[1]);
+          const lon = Number(latLonMatch[3]);
+          fly(lon, lat, 2000);
+          note("<b>" + lat.toFixed(4) + "°, " + lon.toFixed(4) + "°</b>");
+          return;
+        }
+
+        try {
+          const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=" + encodeURIComponent(q);
+          const response = await fetch(url, { headers: { Accept: "application/json" } });
+          if (!response.ok) throw new Error("Request failed");
+          const data = await response.json();
+
+          if (!data || !data.length) {
+            note("No result found for “" + q + "”. Try a city, country, region, or lat, lon.");
+            return;
+          }
+
+          const place = data[0];
+          const lat = Number(place.lat);
+          const lon = Number(place.lon);
+
+          if (place.boundingbox && place.boundingbox.length === 4) {
+            const [south, north, west, east] = place.boundingbox.map(Number);
+            viewer.camera.flyTo({
+              destination: C.Rectangle.fromDegrees(west, south, east, north),
+              duration: 3
+            });
+          } else {
+            fly(lon, lat, 2500);
+          }
+
+          note("<b>" + (place.display_name || place.name || q) + "</b>");
+        } catch (e) {
+          note("Search needs an internet connection, or the place name could not be resolved.");
+        }
+      }
+
+      document.getElementById("go").onclick = search;
+      document.getElementById("q").onkeydown = (e) => {
+        if (e.key === "Enter") search();
+      };
+
+      const hnd = new C.ScreenSpaceEventHandler(sc.canvas);
+
+      hnd.setInputAction((m) => {
+        if (measuring) return;
+        const p = viewer.camera.pickEllipsoid(m.endPosition, g.ellipsoid);
+        if (!p) return;
+
+        const c = C.Cartographic.fromCartesian(p);
+        const alt = g.getHeight(c);
+        const cam = viewer.camera.positionCartographic.height;
+
+        note(
+          "<b>" +
+          C.Math.toDegrees(c.latitude).toFixed(5) + "°, " +
+          C.Math.toDegrees(c.longitude).toFixed(5) + "°</b> · elev " +
+          (alt ? Math.round(alt) + " m" : "0 m") +
+          " · eye " + (cam > 1e4 ? (cam / 1000).toFixed(0) + " km" : Math.round(cam) + " m")
+        );
+      }, C.ScreenSpaceEventType.MOUSE_MOVE);
+
+      const cam = viewer.camera;
+      document.getElementById("tiltU").onclick = () => cam.lookUp(.15);
+      document.getElementById("tiltD").onclick = () => cam.lookDown(.15);
+      document.getElementById("north").onclick = () => {
+        cam.flyTo({
+          destination: cam.position,
+          orientation: { heading: 0, pitch: cam.pitch, roll: 0 },
+          duration: 1
+        });
+      };
+
+      viewer.clock.onTick.addEventListener(() => {
+        if (spinning) cam.rotate(C.Cartesian3.UNIT_Z, -0.002);
+      });
+
+      document.getElementById("spin").onclick = (e) => {
+        spinning = !spinning;
+        e.target.classList.toggle("on", spinning);
+      };
+
+      document.getElementById("me").onclick = () => {
+        if (!navigator.geolocation) {
+          note("Location isn’t available in this browser.");
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (p) => {
+            fly(p.coords.longitude, p.coords.latitude, 1500);
+            viewer.entities.add({
+              position: C.Cartesian3.fromDegrees(p.coords.longitude, p.coords.latitude),
+              point: {
+                pixelSize: 12,
+                color: C.Color.fromCssColorString("#f2b84b"),
+                outlineColor: C.Color.WHITE,
+                outlineWidth: 2,
+                heightReference: C.HeightReference.CLAMP_TO_GROUND
+              }
+            });
+          },
+          () => note("Location permission was denied.")
+        );
+      };
+
+      let measuring = null;
+      let pts = [];
+      let ents = [];
+      let poly = null;
+      const msr = document.getElementById("msr");
+      const R = 6371008.8;
+
+      function dist(a, b) {
+        const p = C.Cartographic.fromCartesian(a);
+        const q = C.Cartographic.fromCartesian(b);
+        return new C.EllipsoidGeodesic(p, q).surfaceDistance;
+      }
+
+      function area(ps) {
+        let s = 0;
+        const c = ps.map(p => C.Cartographic.fromCartesian(p));
+        for (let i = 0; i < c.length; i++) {
+          const a = c[i];
+          const b = c[(i + 1) % c.length];
+          s += (b.longitude - a.longitude) * (2 + Math.sin(a.latitude) + Math.sin(b.latitude));
+        }
+        return Math.abs(s * R * R / 2);
+      }
+
+      const fmtMeter = (m) =>
+        m >= 1000 ? (m / 1000).toFixed(2) + " km (" + (m / 1609.344).toFixed(2) + " mi)" : m.toFixed(0) + " m";
+
+      const fmtArea = (a) =>
+        a >= 1e6
+          ? (a / 1e6).toFixed(3) + " km²"
+          : Math.round(a).toLocaleString() + " m² (" + (a / 4046.856).toFixed(2) + " acres)";
+
+      function updateMeasureUI() {
+        if (poly) viewer.entities.remove(poly);
+        const pos = measuring === "area" && pts.length > 2 ? pts.concat([pts[0]]) : pts;
+
+        if (pts.length > 1) {
+          poly = viewer.entities.add({
+            polyline: {
+              positions: pos,
+              width: 3,
+              material: C.Color.fromCssColorString("#f2b84b"),
+              clampToGround: true
+            }
+          });
+        }
+
+        let total = 0;
+        for (let i = 1; i < pts.length; i++) total += dist(pts[i - 1], pts[i]);
+
+        if (measuring === "area") {
+          const perimeter = pts.length > 2 ? dist(pts[pts.length - 1], pts[0]) : 0;
+          msr.innerHTML =
+            pts.length > 2
+              ? "Area <b>" + fmtArea(area(pts)) + "</b><br>Perimeter <b>" + fmtMeter(total + perimeter) + "</b>"
+              : "Click 3+ points on the map";
+        } else {
+          msr.innerHTML = pts.length > 1 ? "Distance <b>" + fmtMeter(total) + "</b>" : "Click points on the map";
+        }
+      }
+
+      function startMeasure(kind, btn) {
+        clearMeasure();
+        measuring = kind;
+        msr.style.display = "block";
+        updateMeasureUI();
+        document.querySelectorAll("#mDist, #mArea").forEach(b => b.classList.remove("on"));
+        btn.classList.add("on");
+      }
+
+      function clearMeasure() {
+        measuring = null;
+        pts = [];
+        ents.forEach(e => viewer.entities.remove(e));
+        ents = [];
+        if (poly) viewer.entities.remove(poly);
+        poly = null;
+        msr.style.display = "none";
+        document.querySelectorAll("#mDist, #mArea").forEach(b => b.classList.remove("on"));
+      }
+
+      document.getElementById("mDist").onclick = (e) => startMeasure("dist", e.target);
+      document.getElementById("mArea").onclick = (e) => startMeasure("area", e.target);
+      document.getElementById("clr").onclick = clearMeasure;
+
+      hnd.setInputAction((click) => {
+        if (!measuring) return;
+        const p = cam.pickEllipsoid(click.position, g.ellipsoid);
+        if (!p) return;
+
+        pts.push(p);
+        ents.push(viewer.entities.add({
+          position: p,
+          point: {
+            pixelSize: 9,
+            color: C.Color.WHITE,
+            outlineColor: C.Color.fromCssColorString("#f2b84b"),
+            outlineWidth: 3,
+            heightReference: C.HeightReference.CLAMP_TO_GROUND
+          }
+        }));
+
+        updateMeasureUI();
+      }, C.ScreenSpaceEventType.LEFT_CLICK);
+
+      document.getElementById("tokB").onclick = () => {
+        const tok = document.getElementById("tok");
+        tok.style.display = tok.style.display === "flex" ? "none" : "flex";
+      };
+
+      document.getElementById("tokGo").onclick = async () => {
+        const token = document.getElementById("tokI").value.trim();
+        if (!token) {
+          note("Paste a Cesium ion token first.");
+          return;
+        }
+
+        try {
+          C.Ion.defaultAccessToken = token;
+
+          viewer.terrainProvider = await C.createWorldTerrainAsync({
+            requestWaterMask: true,
+            requestVertexNormals: true
+          });
+
+          const buildings = await C.createOsmBuildingsAsync();
+          sc.primitives.add(buildings);
+
+          g.depthTestAgainstTerrain = true;
+          document.getElementById("tokB").classList.add("on");
+          document.getElementById("tok").style.display = "none";
+          note("<b>3D terrain and buildings are on.</b> Tilt the camera near a city.");
+        } catch (e) {
+          note("That token didn’t work. Generate a fresh one at ion.cesium.com.");
+        }
+      };
+
+      const intro = () => {
+        viewer.camera.flyTo({
+          destination: C.Cartesian3.fromDegrees(25, 14, 2.5e7),
+          orientation: {
+            heading: C.Math.toRadians(20),
+            pitch: C.Math.toRadians(-25),
+            roll: 0
+          },
+          duration: 4.2
+        });
+      };
+      intro();
+
+      note("Drag to rotate · scroll to zoom · right-drag or Ctrl-drag to tilt");
+    }
+
+    loadCesiumFromLocalOrCdn();
+  </script>
+</body>
+</html>
